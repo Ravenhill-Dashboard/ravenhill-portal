@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Delivery Portal | Ravenhill Transport</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body {
+            background-color: var(--bg-tertiary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .driver-container {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .logo-container {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo-container img {
+            max-width: 200px;
+        }
+    </style>
+    <!-- Firebase SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="firebase-config.js"></script>
+</head>
+
+<body data-theme="light">
+    <div class="driver-container">
+        <div class="logo-container">
+            <img src="logo-light.jpg" alt="Ravenhill Transport">
+            <h2 style="margin-top: 1rem; color: var(--accent-primary);">Driver Delivery Portal</h2>
+        </div>
+
+        <!-- Login View -->
+        <div id="login-view" class="form-container">
+            <h3 style="margin-bottom: 1rem;">Driver Portal Login</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Please enter your credentials to view your
+                assigned manifest.</p>
+            <form id="driver-login-form">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="login-email" class="form-control" placeholder="driver@ravenhill.com"
+                        required>
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Password</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+                </div>
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Vehicle Registration (To filter manifest)</label>
+                    <input type="text" id="reg-input" class="form-control" placeholder="e.g. XV99SS" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;"><i
+                        class="ph ph-sign-in"></i> Access
+                    Manifest</button>
+            </form>
+            <div id="login-error" class="login-error"
+                style="display: none; margin-top: 1rem; padding: 0.75rem; background: var(--status-created-bg); color: var(--status-created-text); border-radius: var(--radius-sm); font-size: 0.85rem;">
+            </div>
+        </div>
+
+        <!-- Manifest View -->
+        <div id="manifest-view" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 id="manifest-title">My Manifest</h3>
+                <button class="btn btn-icon" onclick="logoutDriver()" style="background: var(--bg-secondary);"><i
+                        class="ph ph-sign-out"></i> Logout</button>
+            </div>
+            <div id="manifest-list" style="display: flex; flex-direction: column; gap: 1rem;">
+                <!-- Assets injected here -->
+            </div>
+        </div>
+
+        <!-- Delivery Report View -->
+        <div id="delivery-view" style="display: none;">
+            <!-- Report injected here -->
+        </div>
+    </div>
+
+    <script src="driver.js"></script>
+</body>
+
+</html>
