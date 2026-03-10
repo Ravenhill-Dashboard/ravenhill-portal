@@ -234,6 +234,12 @@ function closeMobileNav() {
 }
 
 function renderView(route, params = null) {
+  // Mobile Redirect: Dashboard is not for mobile.
+  if (route === 'dashboard' && window.matchMedia('(max-width: 768px)').matches) {
+    navigateStatus('Created');
+    return;
+  }
+
   if (route === 'dashboard') {
     elements.pageTitle.textContent = 'Active Dashboard';
     elements.contentArea.innerHTML = generateDashboardHTML();
@@ -1033,6 +1039,23 @@ window.handlePhotoUpload = function (input) {
         }
         hiddenInput.value = compressedBase64;
 
+        // BACKGROUND AUTO-SAVE: If we are in the Edit Record view, save this photo immediately
+        const editForm = document.getElementById('edit-inspection-form');
+        if (editForm) {
+          const recordId = AppState.currentRoute === 'edit' ? window.location.hash.split('=')[1] : null;
+          // Note: Above is a fallback, but a better way is to check the hidden ID if we have it
+          // Let's actually find the id from the page title or context if possible.
+          // In our app, setupEditFormListeners(id) is called, but we are inside a global window.handlePhotoUpload.
+          // Let's use a simpler check: look for data-id on the form.
+          const id = editForm.dataset.id;
+          if (id) {
+            const updateData = { [originalName]: compressedBase64, updatedAt: new Date().toISOString() };
+            db.collection('inspections').doc(id).update(updateData).then(() => {
+              console.log(`Background saved ${originalName} for ${id}`);
+            }).catch(err => console.error("Auto-save failed:", err));
+          }
+        }
+
         if (span) {
           span.innerHTML = '<i class="ph ph-check-circle" style="color: var(--status-delivered-text)"></i> Uploaded';
           span.style.color = 'var(--status-delivered-text)';
@@ -1121,7 +1144,7 @@ function generateEditFormHTML(id) {
 
   return `
       <div class="form-container">
-      <form id="edit-inspection-form">
+      <form id="edit-inspection-form" data-id="${id}">
         <div class="form-section">
           <h2 class="form-section-title"><i class="ph ph-identification-card"></i> Identifiable Information</h2>
 
@@ -1196,7 +1219,7 @@ function generateEditFormHTML(id) {
 
           <div class="form-group">
             <label class="form-label">If yes, note the existing damage</label>
-            <textarea class="form-control" name="damageNotes">${item.damageNotes || ''}</textarea>
+            <textarea class="form-control" name="damageNotes">${(item.damageNotes && item.damageNotes !== 'None') ? item.damageNotes : ''}</textarea>
           </div>
         </div>
 
@@ -1697,8 +1720,8 @@ function executePrint() {
 
   document.getElementById('modal-container').innerHTML = ''; // close modal
 
-  // small delay for UI draw then print (increased for mobile stability)
-  setTimeout(() => window.print(), 500);
+  // small delay for UI draw then print (optimized for instant feel)
+  setTimeout(() => window.print(), 150);
 }
 
 window.openPrintModal = openPrintModal;
