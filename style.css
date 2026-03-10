@@ -1043,12 +1043,19 @@ textarea.form-control {
   font-weight: 600;
 }
 
+@media (max-width: 768px) {
+
+  #nav-dashboard,
+  #column-filter-btn {
+    display: none !important;
+  }
+}
+
 .nav-count-badge {
   margin-left: auto;
-  min-width: 1.25rem;
+  width: 1.25rem;
   height: 1.25rem;
-  padding: 0 0.25rem;
-  border-radius: var(--radius-full);
+  border-radius: 50%;
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   font-size: 0.7rem;
@@ -1058,18 +1065,13 @@ textarea.form-control {
   justify-content: center;
   border: 1px solid var(--border-color);
   transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .nav-sublink.active .nav-count-badge {
   background: var(--accent-primary);
   color: white;
   border-color: var(--accent-primary);
-}
-
-@media (max-width: 768px) {
-  #nav-dashboard {
-    display: none !important;
-  }
 }
 
 /* ================================
