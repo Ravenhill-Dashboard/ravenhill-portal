@@ -9,6 +9,7 @@ const DriverState = {
     if (!normalizedReg) return [];
 
     return this.inspections.filter(i => {
+      // Driver sees both In Transit and Assigned Pick-up
       if (i.status !== 'In Transit' && i.status !== 'Assigned Pick-up') return false;
       const assigned = (i.assignedTransport || '').toLowerCase().trim();
       return assigned === normalizedReg;
@@ -219,7 +220,7 @@ function openDeliveryReport(id) {
           </button>
         ` : ''}
       </div>
-      <form onsubmit="submitDelivery(event, '${id}')" id="delivery-form-${id}">
+      <form onsubmit="submitDelivery(event, '${id}')" id="delivery-form-${id}" data-id="${id}">
         <div class="form-group">
           <label class="form-label">Any new damage during transit?</label>
           <textarea class="form-control" name="newTransitDamage" placeholder="Note any issues. If none, leave blank."></textarea>
@@ -357,21 +358,64 @@ window.handlePhotoUpload = function (input) {
   if (input.files && input.files.length > 0) {
     const file = input.files[0];
     const reader = new FileReader();
+    const span = input.parentElement.querySelector('.upload-text');
 
-    reader.onload = function (e) {
-      const base64 = e.target.result;
-      const span = input.parentElement.querySelector('.upload-text');
-      if (span) {
-        span.innerHTML = `<i class="ph ph-check-circle"></i> Uploaded ✓`;
-        input.parentElement.style.background = 'rgba(22,163,74,0.08)';
-        input.parentElement.style.borderColor = '#16a34a';
-        span.style.color = '#16a34a';
+    if (span) {
+      span.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Compressing...';
+    }
+
+    reader.onload = async function (e) {
+      try {
+        const compressedBase64 = await compressImage(e.target.result, 1200, 0.7);
+
+        if (span) {
+          span.innerHTML = `<i class="ph ph-check-circle"></i> Uploaded ✓`;
+          input.parentElement.style.background = 'rgba(22,163,74,0.08)';
+          input.parentElement.style.borderColor = '#16a34a';
+          span.style.color = '#16a34a';
+        }
+        input.dataset.base64 = compressedBase64;
+
+        // BACKGROUND AUTO-SAVE: If we have an ID, save this photo immediately to Firestore
+        const recordId = input.closest('form')?.dataset.id;
+        if (recordId) {
+          const fieldName = input.name;
+          await db.collection('inspections').doc(recordId).update({
+            [fieldName]: compressedBase64,
+            updatedAt: new Date().toISOString()
+          });
+          console.log(`Auto-saved ${fieldName} for ${recordId}`);
+        }
+      } catch (err) {
+        console.error("Upload error:", err);
+        if (span) span.innerHTML = '<i class="ph ph-warning"></i> Error';
       }
-      input.dataset.base64 = base64;
     };
     reader.readAsDataURL(file);
   }
 };
+
+function compressImage(base64, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = base64;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+  });
+}
 
 window.markAtFacility = async function (id) {
   const item = DriverState.inspections.find(i => i.id === id);
@@ -421,7 +465,7 @@ window.openPickUpReport = function (id) {
         </div>
       </div>
       
-      <form onsubmit="submitPickUp(event, '${id}')">
+      <form onsubmit="submitPickUp(event, '${id}')" data-id="${id}">
         <div class="form-section">
           <h3 class="form-section-title"><i class="ph ph-warning-circle"></i> Damage Report</h3>
           <div class="form-group">
@@ -433,7 +477,7 @@ window.openPickUpReport = function (id) {
           </div>
           <div class="form-group">
             <label class="form-label">Existing damage notes</label>
-            <textarea class="form-control" name="damageNotes"></textarea>
+            <textarea class="form-control" name="damageNotes">${(item.damageNotes && item.damageNotes !== 'None') ? item.damageNotes : ''}</textarea>
           </div>
         </div>
 
@@ -533,16 +577,39 @@ window.submitPickUp = async function (e, id) {
       statusChangedAt: timestamp
     };
 
-    if (!item.history) item.history = [];
-    const newHistory = [...item.history];
-    newHistory.push({ status: 'Collected', timestamp: timestamp });
-    newHistory.push({ status: `In Transit (Truck: ${DriverState.currentReg})`, timestamp: timestamp });
-    updateData.history = newHistory;
+    // Remove any raw File objects from photos that might have been picked up by FormData
+    Object.keys(updateData).forEach(key => {
+      if (key.startsWith('photo_') && typeof updateData[key] !== 'string') {
+        delete updateData[key];
+      }
+    });
 
-    await db.collection('inspections').doc(id).update(updateData);
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Saving...';
+    }
 
-    alert('Pick Up completed! Item is now In Transit.');
-    showManifest();
+    try {
+      if (!item.history) item.history = [];
+      const newHistory = [...item.history];
+      newHistory.push({ status: 'Collected', timestamp: timestamp });
+      newHistory.push({ status: `In Transit (Truck: ${DriverState.currentReg})`, timestamp: timestamp });
+      updateData.history = newHistory;
+
+      await db.collection('inspections').doc(id).update(updateData);
+
+      alert('Pick Up completed! Item is now In Transit.');
+      document.getElementById('delivery-view').innerHTML = ''; // Clear stale form
+      showManifest();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save pickup. Please try again.');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ph ph-check-circle"></i> Complete Pick Up';
+      }
+    }
   }
 };
 
@@ -644,15 +711,38 @@ window.submitDelivery = async function (e, id) {
       updatedAt: timestamp
     };
 
-    if (!item.history) item.history = [];
-    const newHistory = [...item.history];
-    newHistory.push({ status: 'Delivered', timestamp: timestamp });
-    updateData.history = newHistory;
+    // Remove raw Files
+    Object.keys(updateData).forEach(key => {
+      if (key.startsWith('photo_') && typeof updateData[key] !== 'string') {
+        delete updateData[key];
+      }
+    });
 
-    await db.collection('inspections').doc(id).update(updateData);
+    const btn = e.target.querySelector('button[type="submit"]');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Delivering...';
+    }
 
-    alert('Delivery completed successfully! Item cleared from manifest.');
-    showManifest(); // refresh manifest
+    try {
+      if (!item.history) item.history = [];
+      const newHistory = [...item.history];
+      newHistory.push({ status: 'Delivered', timestamp: timestamp });
+      updateData.history = newHistory;
+
+      await db.collection('inspections').doc(id).update(updateData);
+
+      alert('Delivery completed successfully! Item cleared from manifest.');
+      document.getElementById('delivery-view').innerHTML = ''; // Clear stale form
+      showManifest(); // refresh manifest
+    } catch (err) {
+      console.error(err);
+      alert('Failed to complete delivery. Please try again.');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ph ph-check-circle"></i> Complete Delivery Handover';
+      }
+    }
   }
 };
 
