@@ -14,6 +14,7 @@ const AppState = {
 
   // Dashboard column visibility — persisted locally
   dashboardColumns: JSON.parse(localStorage.getItem('dashboardColumns')) || [...ALL_STATUSES],
+  lastStatusView: 'Created', // Remember last status list for navigation return
 
   savePreferences() {
     localStorage.setItem('theme', this.theme);
@@ -557,6 +558,8 @@ function updateSidebarCounts() {
       if (deliveredAt > cutoff) {
         counts['Delivered']++;
       }
+    } else if (item.status === 'Assigned Pick-up' || item.status === 'In Transit') {
+      counts['In Transit']++;
     } else if (counts.hasOwnProperty(item.status)) {
       counts[item.status]++;
     }
@@ -669,6 +672,7 @@ function applyColumnFilter() {
 // Manage Records — Sidebar Navigation Helpers
 // =============================================
 function navigateStatus(status) {
+  AppState.lastStatusView = status;
   // Deactivate all main nav links
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
   // Activate all sub-links and then only the one matching the selected status
@@ -705,6 +709,9 @@ function generateStatusListHTML(status) {
     items = AppState.inspections.filter(i =>
       i.status === 'Delivered' && (now - new Date(i.updatedAt || i.createdAt).getTime()) < oneDayMs
     );
+  } else if (status === 'In Transit') {
+    // Include both 'In Transit' and 'Assigned Pick-up' in this view
+    items = AppState.inspections.filter(i => i.status === 'In Transit' || i.status === 'Assigned Pick-up');
   } else {
     items = AppState.inspections.filter(i => i.status === status);
   }
@@ -955,11 +962,11 @@ function generateCreateFormHTML() {
              <h2 class="form-section-title"><i class="ph ph-signature"></i> Final Sign Off</h2>
              <div class="form-group">
                <label class="form-label">Inspector Full Name</label>
-               <input type="text" class="form-control" name="inspectorName" placeholder="e.g. Jane Smith">
+               <input type="text" class="form-control" name="inspectorName" placeholder="e.g. Jane Smith" oninput="this.value = this.value.replace(/(?:^|\\s)\\S/g, a => a.toUpperCase())">
              </div>
              <div class="form-group">
                <label class="form-label">Inspector Signature (Type name to e-sign)</label>
-               <input type="text" class="form-control" name="inspectorSignature" style="font-family: 'Brush Script MT', cursive; font-size: 1.25rem;">
+               <input type="text" class="form-control" name="inspectorSignature" style="font-family: 'Brush Script MT', cursive; font-size: 1.25rem;" oninput="this.value = this.value.replace(/(?:^|\\s)\\S/g, a => a.toUpperCase())">
              </div>
           </div>
           
@@ -1002,33 +1009,72 @@ window.handlePhotoUpload = function (input) {
     const file = input.files[0];
     const reader = new FileReader();
 
-    reader.onload = function (e) {
-      const base64 = e.target.result;
+    const label = input.closest('.btn');
+    const span = label.querySelector('.upload-text');
+    if (span) {
+      span.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Compressing...';
+    }
 
-      const originalName = input.dataset.name || input.name;
-      if (!input.dataset.name) input.dataset.name = originalName;
+    reader.onload = async function (e) {
+      try {
+        // Compress image to max 1200px width and 0.7 quality
+        const compressedBase64 = await compressImage(e.target.result, 1200, 0.7);
 
-      let hiddenInput = input.parentElement.querySelector(`input[type="hidden"][name="${originalName}"]`);
-      if (!hiddenInput) {
-        input.removeAttribute('name'); // ensure the raw File object isn't grabbed
-        hiddenInput = document.createElement('input');
-        hiddenInput.type = 'hidden';
-        hiddenInput.name = originalName;
-        input.parentElement.appendChild(hiddenInput);
-      }
-      hiddenInput.value = base64;
+        const originalName = input.dataset.name || input.name;
+        if (!input.dataset.name) input.dataset.name = originalName;
 
-      const label = input.closest('.btn');
-      const span = label.querySelector('.upload-text');
-      if (span) {
-        span.innerHTML = '<i class="ph ph-check-circle" style="color: var(--status-delivered-text)"></i> Uploaded';
-        span.style.color = 'var(--status-delivered-text)';
+        let hiddenInput = input.parentElement.querySelector(`input[type="hidden"][name="${originalName}"]`);
+        if (!hiddenInput) {
+          input.removeAttribute('name');
+          hiddenInput = document.createElement('input');
+          hiddenInput.type = 'hidden';
+          hiddenInput.name = originalName;
+          input.parentElement.appendChild(hiddenInput);
+        }
+        hiddenInput.value = compressedBase64;
+
+        if (span) {
+          span.innerHTML = '<i class="ph ph-check-circle" style="color: var(--status-delivered-text)"></i> Uploaded';
+          span.style.color = 'var(--status-delivered-text)';
+        }
+      } catch (err) {
+        console.error('Compression error:', err);
+        if (span) span.innerHTML = '<i class="ph ph-warning"></i> Error';
       }
     };
 
     reader.readAsDataURL(file);
   }
 };
+
+/**
+ * Client-side image compression
+ */
+function compressImage(base64, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.src = base64;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+  });
+}
 
 function setupFormListeners() {
   const form = document.getElementById('inspection-form');
@@ -1051,7 +1097,16 @@ function setupFormListeners() {
       try {
         await AppState.addInspection(data);
         alert('Record created successfully! Status set to Created.');
-        navigate('dashboard');
+
+        // Reset form to ensure fields are cleared for next time
+        form.reset();
+
+        // Return to the last viewed status list OR created list
+        if (AppState.lastStatusView) {
+          navigateStatus(AppState.lastStatusView);
+        } else {
+          navigateStatus('Created');
+        }
       } catch (err) {
         console.error('Error saving record:', err);
         alert('Failed to save record to database. Please check console for details.');
@@ -1268,7 +1323,9 @@ function setupEditFormListeners(id) {
         data.updatedAt = new Date().toISOString();
         await db.collection('inspections').doc(id).update(data);
         alert('Record updated successfully!');
-        navigate('item-detail', { id: id });
+
+        // Stay on the details screen to review changes
+        renderView('item-detail', { id: id });
       } catch (err) {
         console.error('Error updating record:', err);
         alert('Failed to update record in database. Check console.');
@@ -1640,8 +1697,8 @@ function executePrint() {
 
   document.getElementById('modal-container').innerHTML = ''; // close modal
 
-  // small delay for UI draw then print
-  setTimeout(() => window.print(), 100);
+  // small delay for UI draw then print (increased for mobile stability)
+  setTimeout(() => window.print(), 500);
 }
 
 window.openPrintModal = openPrintModal;
