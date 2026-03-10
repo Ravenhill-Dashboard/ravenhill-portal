@@ -125,10 +125,17 @@ function init() {
       // Start Real-time Listeners
       startRealTimeSync();
 
-      // Navigate to dashboard if on initial load
+      // Navigate to dashboard if on initial load (Mobile redirect to Created)
       if (AppState.currentRoute === 'dashboard') {
-        renderView('dashboard');
+        if (window.innerWidth <= 768) {
+          navigateStatus('Created');
+        } else {
+          renderView('dashboard');
+        }
       }
+
+      // Update sidebar counts immediately
+      updateSidebarCounts();
     } else {
       AppState.currentUser = null;
       document.body.setAttribute('data-auth', 'hidden');
@@ -170,8 +177,15 @@ function init() {
     });
   });
 
-  // Initial render
-  renderView('dashboard');
+  // Initial render (with mobile check)
+  if (window.innerWidth <= 768 && AppState.currentRoute === 'dashboard') {
+    navigateStatus('Created');
+  } else {
+    renderView(AppState.currentRoute);
+  }
+
+  // Initial update of badges
+  updateSidebarCounts();
 
   // Restore filter button active state if not all columns are selected
   const filterBtn = document.getElementById('column-filter-btn');
@@ -515,6 +529,10 @@ function startRealTimeSync() {
     .orderBy('createdAt', 'desc')
     .onSnapshot(snapshot => {
       AppState.inspections = snapshot.docs.map(doc => doc.data());
+
+      // Update sidebar counts
+      updateSidebarCounts();
+
       if (AppState.currentRoute === 'dashboard' || AppState.currentRoute === 'status-list') {
         renderView(AppState.currentRoute, AppState.currentRoute === 'status-list' ? { status: elements.pageTitle.textContent } : null);
       }
@@ -528,6 +546,36 @@ function startRealTimeSync() {
         renderView('transports');
       }
     });
+}
+
+function updateSidebarCounts() {
+  const counts = {};
+  ALL_STATUSES.forEach(s => counts[s] = 0);
+
+  // Delivered 24h filter parity
+  const now = new Date();
+  const cutoff = now.getTime() - (24 * 60 * 60 * 1000);
+
+  AppState.inspections.forEach(item => {
+    if (item.status === 'Delivered') {
+      const deliveredAt = new Date(item.statusChangedAt || item.updatedAt).getTime();
+      if (deliveredAt > cutoff) {
+        counts['Delivered']++;
+      }
+    } else if (counts.hasOwnProperty(item.status)) {
+      counts[item.status]++;
+    }
+  });
+
+  // Update DOM
+  ALL_STATUSES.forEach(status => {
+    const el = document.getElementById(`count-${status}`);
+    if (el) {
+      el.textContent = counts[status];
+      // Hide if 0 to keep it clean, or keep it? User asked for counts. Showing 0 is usually better.
+      el.style.display = counts[status] > 0 ? 'flex' : 'none';
+    }
+  });
 }
 
 function stopRealTimeSync() {

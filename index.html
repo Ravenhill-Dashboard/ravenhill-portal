@@ -51,7 +51,7 @@
         <img src="logo-dark.jpg" alt="Ravenhill Transport" class="brand-logo dark-only" />
       </div>
       <nav class="nav-links">
-        <a href="#" class="nav-link active" data-route="dashboard">
+        <a href="#" class="nav-link active" data-route="dashboard" id="nav-dashboard">
           <i class="ph ph-squares-four"></i> Dashboard
         </a>
         <a href="#" class="nav-link" data-route="create">
@@ -74,20 +74,29 @@
         </div>
         <div class="nav-subnav" id="manage-records-subnav" style="display:none;">
           <a href="#" class="nav-sublink" data-status="Created" onclick="navigateStatus('Created')">
-            <span class="nav-status-dot" style="background:var(--status-created-text);"></span> Created
+            <span class="nav-status-dot" style="background:var(--status-created-text);"></span>
+            <span>Created</span>
+            <span class="nav-count-badge" id="count-Created">0</span>
           </a>
           <a href="#" class="nav-sublink" data-status="Collected" onclick="navigateStatus('Collected')">
-            <span class="nav-status-dot" style="background:var(--status-collected-text);"></span> Collected
+            <span class="nav-status-dot" style="background:var(--status-collected-text);"></span>
+            <span>Collected</span>
+            <span class="nav-count-badge" id="count-Collected">0</span>
           </a>
           <a href="#" class="nav-sublink" data-status="At Facility" onclick="navigateStatus('At Facility')">
-            <span class="nav-status-dot" style="background:var(--status-holding-text);"></span> At Facility
+            <span class="nav-status-dot" style="background:var(--status-holding-text);"></span>
+            <span>At Facility</span>
+            <span class="nav-count-badge" id="count-At Facility">0</span>
           </a>
           <a href="#" class="nav-sublink" data-status="In Transit" onclick="navigateStatus('In Transit')">
-            <span class="nav-status-dot" style="background:var(--status-transit-text);"></span> In Transit
+            <span class="nav-status-dot" style="background:var(--status-transit-text);"></span>
+            <span>In Transit</span>
+            <span class="nav-count-badge" id="count-In Transit">0</span>
           </a>
           <a href="#" class="nav-sublink" data-status="Delivered" onclick="navigateStatus('Delivered')">
-            <span class="nav-status-dot" style="background:var(--status-delivered-text);"></span> Delivered <span
-              style="font-size:0.65rem; opacity:0.7;">(24h)</span>
+            <span class="nav-status-dot" style="background:var(--status-delivered-text);"></span>
+            <span>Delivered <span style="font-size:0.65rem; opacity:0.7;">(24h)</span></span>
+            <span class="nav-count-badge" id="count-Delivered">0</span>
           </a>
         </div>
       </nav>
