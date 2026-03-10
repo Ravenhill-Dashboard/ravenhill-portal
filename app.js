@@ -14,11 +14,12 @@ const AppState = {
 
   // Dashboard column visibility — persisted locally
   dashboardColumns: JSON.parse(localStorage.getItem('dashboardColumns')) || [...ALL_STATUSES],
-  lastStatusView: 'Created', // Remember last status list for navigation return
+  lastStatusView: localStorage.getItem('lastStatusView') || 'Created', // Remember last status list for navigation return
 
   savePreferences() {
     localStorage.setItem('theme', this.theme);
     localStorage.setItem('dashboardColumns', JSON.stringify(this.dashboardColumns));
+    localStorage.setItem('lastStatusView', this.lastStatusView);
   },
 
   async addInspection(data) {
@@ -180,7 +181,7 @@ function init() {
 
   // Initial render (with mobile check)
   if (window.matchMedia('(max-width: 768px)').matches && AppState.currentRoute === 'dashboard') {
-    navigateStatus('Created');
+    navigateStatus(AppState.lastStatusView || 'Created');
   } else {
     renderView(AppState.currentRoute);
   }
@@ -236,7 +237,7 @@ function closeMobileNav() {
 function renderView(route, params = null) {
   // Mobile Redirect: Dashboard is not for mobile.
   if (route === 'dashboard' && window.matchMedia('(max-width: 768px)').matches) {
-    navigateStatus('Created');
+    navigateStatus(AppState.lastStatusView || 'Created');
     return;
   }
 
@@ -1023,8 +1024,8 @@ window.handlePhotoUpload = function (input) {
 
     reader.onload = async function (e) {
       try {
-        // Compress image to max 1200px width and 0.7 quality
-        const compressedBase64 = await compressImage(e.target.result, 1200, 0.7);
+        // High compression to speed up report generation (600px, 0.4 quality)
+        const compressedBase64 = await compressImage(e.target.result, 600, 0.4);
 
         const originalName = input.dataset.name || input.name;
         if (!input.dataset.name) input.dataset.name = originalName;
@@ -1718,8 +1719,8 @@ function executePrint() {
 
   document.getElementById('modal-container').innerHTML = ''; // close modal
 
-  // small delay for UI draw then print (optimized for instant feel)
-  setTimeout(() => window.print(), 150);
+  // small delay for UI draw then print (optimized for instant feel on iOS)
+  setTimeout(() => window.print(), 50);
 }
 
 window.openPrintModal = openPrintModal;
