@@ -327,8 +327,25 @@ function initSignaturePad(canvasId) {
     lastY = pos.y;
   }
 
-  function stopDrawing() {
-    isDrawing = false;
+  async function stopDrawing() {
+    if (isDrawing) {
+      isDrawing = false;
+      // BACKGROUND AUTO-SAVE: Save signature immediately to Firestore if we have an ID
+      const recordId = canvas.closest('form')?.dataset.id;
+      if (recordId) {
+        const fieldName = canvas.id.replace('-pad', 'Img'); // receiver-signature-pad -> receiverSignatureImg
+        const signatureData = canvas.toDataURL('image/png');
+        try {
+          await db.collection('inspections').doc(recordId).update({
+            [fieldName]: signatureData,
+            updatedAt: new Date().toISOString()
+          });
+          console.log(`Auto-saved signature ${fieldName} for ${recordId}`);
+        } catch (err) {
+          console.error("Signature auto-save failed:", err);
+        }
+      }
+    }
   }
 
   canvas.addEventListener('mousedown', startDrawing);
@@ -701,6 +718,7 @@ window.submitDelivery = async function (e, id) {
     return;
   }
 
+  // Update hidden inputs with latest canvas data BEFORE creating FormData
   document.getElementById('receiver-signature-data').value = receiverCanvas.toDataURL('image/png');
   document.getElementById('driver-signature-data').value = driverCanvas.toDataURL('image/png');
 
@@ -715,12 +733,12 @@ window.submitDelivery = async function (e, id) {
       updatedAt: timestamp
     };
 
-    // CRITICAL: Strip signature images from final update (already saved in background or handled manually)
-    // Actually for signatures, they aren't background saved yet in Driver Portal.
-    // However, for Driver Portal delivery, there are only 2 signatures (~200kb total).
-    // We only need to strip photos to keep payload safe.
+    // CRITICAL: Strip any large photo/signature strings from the final update payload.
+    // These are already saved to the database instantly in the background when 
+    // uploaded/drawn. Removing them here keeps the final text-save lightweight and
+    // prevents browser timeouts/payload size errors on mobile.
     Object.keys(updateData).forEach(key => {
-      if (key.startsWith('photo_')) {
+      if (key.startsWith('photo_') || key === 'driverSignatureImg' || key === 'receiverSignatureImg') {
         delete updateData[key];
       }
     });

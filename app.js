@@ -1015,9 +1015,8 @@ window.handlePhotoUpload = function (input) {
   if (input.files && input.files.length > 0) {
     const file = input.files[0];
     const reader = new FileReader();
+    const span = input.parentElement.querySelector('.upload-text');
 
-    const label = input.closest('.btn');
-    const span = label.querySelector('.upload-text');
     if (span) {
       span.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Compressing...';
     }
@@ -1027,46 +1026,28 @@ window.handlePhotoUpload = function (input) {
         // High compression to speed up report generation (600px, 0.4 quality)
         const compressedBase64 = await compressImage(e.target.result, 600, 0.4);
 
-        const originalName = input.dataset.name || input.name;
-        if (!input.dataset.name) input.dataset.name = originalName;
-
-        let hiddenInput = input.parentElement.querySelector(`input[type="hidden"][name="${originalName}"]`);
-        if (!hiddenInput) {
-          input.removeAttribute('name');
-          hiddenInput = document.createElement('input');
-          hiddenInput.type = 'hidden';
-          hiddenInput.name = originalName;
-          input.parentElement.appendChild(hiddenInput);
-        }
-        hiddenInput.value = compressedBase64;
-
-        // BACKGROUND AUTO-SAVE: If we are in the Edit Record view, save this photo immediately
-        const editForm = document.getElementById('edit-inspection-form');
-        if (editForm) {
-          const recordId = AppState.currentRoute === 'edit' ? window.location.hash.split('=')[1] : null;
-          // Note: Above is a fallback, but a better way is to check the hidden ID if we have it
-          // Let's actually find the id from the page title or context if possible.
-          // In our app, setupEditFormListeners(id) is called, but we are inside a global window.handlePhotoUpload.
-          // Let's use a simpler check: look for data-id on the form.
-          const id = editForm.dataset.id;
-          if (id) {
-            const updateData = { [originalName]: compressedBase64, updatedAt: new Date().toISOString() };
-            db.collection('inspections').doc(id).update(updateData).then(() => {
-              console.log(`Background saved ${originalName} for ${id}`);
-            }).catch(err => console.error("Auto-save failed:", err));
-          }
-        }
-
         if (span) {
-          span.innerHTML = '<i class="ph ph-check-circle" style="color: var(--status-delivered-text)"></i> Uploaded';
-          span.style.color = 'var(--status-delivered-text)';
+          span.innerHTML = `<i class="ph ph-check-circle"></i> Uploaded ✓`;
+          input.parentElement.style.background = 'rgba(22,163,74,0.08)';
+          input.parentElement.style.borderColor = '#16a34a';
+          span.style.color = '#16a34a';
+        }
+
+        // BACKGROUND AUTO-SAVE: If we have an ID, save this photo immediately to Firestore
+        const recordId = input.closest('form')?.dataset.id;
+        if (recordId) {
+          const fieldName = input.name;
+          await db.collection('inspections').doc(recordId).update({
+            [fieldName]: compressedBase64,
+            updatedAt: new Date().toISOString()
+          });
+          console.log(`Auto-saved ${fieldName} for ${recordId}`);
         }
       } catch (err) {
-        console.error('Compression error:', err);
+        console.error("Upload error:", err);
         if (span) span.innerHTML = '<i class="ph ph-warning"></i> Error';
       }
     };
-
     reader.readAsDataURL(file);
   }
 };
@@ -1324,36 +1305,44 @@ function generateEditFormHTML(id) {
 
 function setupEditFormListeners(id) {
   const form = document.getElementById('edit-inspection-form');
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+  const btn = form.querySelector('button[type="submit"]');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-      const formData = new FormData(form);
-      const data = Object.fromEntries(formData.entries());
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Saving...';
+    }
 
-      // CRITICAL: Strip any large photo/signature strings from the final update payload.
-      // These are already saved to the database instantly in the background when 
-      // uploaded/drawn. Removing them here keeps the final text-save lightweight and
-      // prevents browser timeouts/payload size errors on mobile.
-      Object.keys(data).forEach(key => {
-        if (key.startsWith('photo_') || key === 'driverSignatureImg' || key === 'receiverSignatureImg') {
-          delete data[key];
-        }
-      });
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
 
-      try {
-        data.updatedAt = new Date().toISOString();
-        await db.collection('inspections').doc(id).update(data);
-        alert('Record updated successfully!');
-
-        // Stay on the details screen to review changes
-        renderView('item-detail', { id: id });
-      } catch (err) {
-        console.error('Error updating record:', err);
-        alert('Failed to update record in database. Check console.');
+    // CRITICAL: Strip any large photo/signature strings from the final update payload.
+    // These are already saved to the database instantly in the background when 
+    // uploaded/drawn. Removing them here keeps the final text-save lightweight and
+    // prevents browser timeouts/payload size errors on mobile.
+    Object.keys(data).forEach(key => {
+      if (key.startsWith('photo_') || key === 'driverSignatureImg' || key === 'receiverSignatureImg') {
+        delete data[key];
       }
     });
-  }
+
+    try {
+      data.updatedAt = new Date().toISOString();
+      await db.collection('inspections').doc(id).update(data);
+      alert('Record updated successfully!');
+
+      // Stay on the details screen to review changes
+      renderView('item-detail', { id: id });
+    } catch (err) {
+      console.error('Error updating record:', err);
+      alert('Failed to update record in database. Check console.');
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ph ph-check-circle"></i> Save Edits';
+      }
+    }
+  });
 }
 
 function generateSearchHTML() {
