@@ -119,7 +119,7 @@ function init() {
       AppState.currentUser = user;
       document.body.setAttribute('data-auth', 'visible');
       elements.userNameDisplay.textContent = user.email.split('@')[0].replace('.', ' ').toUpperCase();
-      elements.userRoleDisplay.textContent = 'Authorized Staff';
+      elements.userRoleDisplay.textContent = 'Staff';
       elements.userAvatar.textContent = user.email.substring(0, 2).toUpperCase();
 
       // Start Real-time Listeners
@@ -127,7 +127,7 @@ function init() {
 
       // Navigate to dashboard if on initial load (Mobile redirect to Created)
       if (AppState.currentRoute === 'dashboard') {
-        if (window.innerWidth <= 768) {
+        if (window.matchMedia('(max-width: 768px)').matches) {
           navigateStatus('Created');
         } else {
           renderView('dashboard');
@@ -178,7 +178,7 @@ function init() {
   });
 
   // Initial render (with mobile check)
-  if (window.innerWidth <= 768 && AppState.currentRoute === 'dashboard') {
+  if (window.matchMedia('(max-width: 768px)').matches && AppState.currentRoute === 'dashboard') {
     navigateStatus('Created');
   } else {
     renderView(AppState.currentRoute);
@@ -192,11 +192,6 @@ function init() {
   if (filterBtn && AppState.dashboardColumns.length < ALL_STATUSES.length) {
     filterBtn.style.background = 'var(--accent-primary)';
     filterBtn.style.color = '#fff';
-  }
-
-  // Seed some mock data if empty for demo purposes
-  if (AppState.inspections.length === 0) {
-    seedMockData();
   }
 }
 
@@ -572,8 +567,8 @@ function updateSidebarCounts() {
     const el = document.getElementById(`count-${status}`);
     if (el) {
       el.textContent = counts[status];
-      // Hide if 0 to keep it clean, or keep it? User asked for counts. Showing 0 is usually better.
-      el.style.display = counts[status] > 0 ? 'flex' : 'none';
+      // Always show counts to confirm they are working
+      el.style.display = 'flex';
     }
   });
 }
@@ -2192,37 +2187,8 @@ window.toggleTheme = toggleTheme;
 window.toggleMobileNav = toggleMobileNav;
 window.closeMobileNav = closeMobileNav;
 
-// Helper to load some data
-function seedMockData() {
-  const now = new Date();
-  const oldDate = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString(); // 72 hours ago
+// Helper to load some data removed
 
-  // Seed recent items
-  AppState.addInspection({ vehicleType: 'Caravan', identifier: 'Jayco Silverline', damageNotes: 'None' });
-  AppState.updateInspectionStatus(AppState.inspections[0].id, 'In Transit');
-
-  setTimeout(() => {
-    AppState.addInspection({ vehicleType: 'Boat', identifier: 'Quintrex 420', damageNotes: 'Scrape on hull' });
-    AppState.updateInspectionStatus(AppState.inspections[0].id, 'At Facility');
-  }, 100);
-
-  setTimeout(() => {
-    AppState.addInspection({ vehicleType: 'Vehicle', identifier: 'Toyota Hilux - ABC123', damageNotes: 'Minor dent front left' });
-  }, 200);
-
-  setTimeout(() => {
-    // Seed old items
-    const oldDelivered = AppState.addInspection({ vehicleType: 'Vehicle', identifier: 'Old Delivered Test', damageNotes: 'None' });
-    const oldCreated = AppState.addInspection({ vehicleType: 'Caravan', identifier: 'Old Created Test', damageNotes: 'None' });
-
-    // Override their createdAt locally bypassing the addInspection wrapper slightly
-    AppState.inspections.find(i => i.id === oldDelivered.id).createdAt = oldDate;
-    AppState.inspections.find(i => i.id === oldCreated.id).createdAt = oldDate;
-
-    AppState.updateInspectionStatus(oldDelivered.id, 'Delivered');
-    AppState.savePreferences();
-  }, 300);
-}
 
 function initSignaturePad(canvasId) {
   const canvas = document.getElementById(canvasId);
