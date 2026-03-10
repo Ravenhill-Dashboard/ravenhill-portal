@@ -889,6 +889,14 @@ textarea.form-control {
   }
 }
 
+.hamburger-menu {
+  display: none;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .hamburger-menu {
     display: flex !important;
@@ -922,14 +930,6 @@ textarea.form-control {
   .kanban-board {
     grid-template-columns: 1fr;
   }
-}
-
-.hamburger-menu {
-  display: none !important;
-}
-
-.sidebar-overlay {
-  display: none;
 }
 
 /* Modal Styles */
