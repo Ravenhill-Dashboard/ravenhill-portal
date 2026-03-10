@@ -756,7 +756,7 @@ function generateStatusListHTML(status) {
       topRightMeta = `<i class="ph ph-calendar"></i> ${new Date(item.bookedCollectionTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
     } else if (isCreated) {
       topRightMeta = `<i class="ph ph-calendar-slash" style="opacity:0.45;"></i> <span style="opacity:0.5;">No booking set</span>`;
-    } else if (item.status === 'In Transit' && item.assignedTransport) {
+    } else if (['In Transit', 'Assigned Pick-up'].includes(item.status) && item.assignedTransport) {
       topRightMeta = `<i class="ph ph-truck"></i> ${item.assignedTransport}`;
     } else {
       topRightMeta = `<i class="ph ph-clock"></i> ${timeAgo(item.statusChangedAt || item.updatedAt || item.createdAt)}`;

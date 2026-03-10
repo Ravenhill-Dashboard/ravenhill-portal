@@ -205,7 +205,11 @@ function openDeliveryReport(id) {
   const item = DriverState.inspections.find(i => i.id === id);
   if (!item) return;
 
-  const hasBeenPickedUp = item.history && item.history.some(h => h.status === 'Collected');
+  // Refined check: Only show "Book into Facility" if the *most recent* major event was a pickup.
+  // We filter out timestamp-only updates and look at the last status change.
+  const significantHistory = item.history ? item.history.filter(h => h.status && !h.status.includes('Truck:')) : [];
+  const lastStatus = significantHistory.length > 0 ? significantHistory[significantHistory.length - 1].status : '';
+  const hasBeenPickedUp = lastStatus === 'Collected';
 
   deliveryView.innerHTML = `
     <div class="form-container">
@@ -438,7 +442,9 @@ function compressImage(base64, maxWidth, quality) {
 window.markAtFacility = async function (id) {
   const item = DriverState.inspections.find(i => i.id === id);
   if (item) {
-    const hasBeenPickedUp = item.history && item.history.some(h => h.status === 'Collected');
+    const significantHistory = item.history ? item.history.filter(h => h.status && !h.status.includes('Truck:')) : [];
+    const lastStatus = significantHistory.length > 0 ? significantHistory[significantHistory.length - 1].status : '';
+    const hasBeenPickedUp = lastStatus === 'Collected';
     if (!hasBeenPickedUp) {
       alert("This item cannot be booked into a facility because it did not originate from a pick-up.");
       return;
