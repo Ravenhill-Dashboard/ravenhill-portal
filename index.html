@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ravenhill Transport - Internal Inspection Platform</title>
+  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Phosphor Icons for modern minimalist icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Firebase SDKs (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+</head>
+
+<body data-auth="hidden">
+
+  <div id="login-overlay" class="login-overlay">
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="logo-light.jpg" alt="Ravenhill Transport" />
+      </div>
+      <h2>Admin Portal Login</h2>
+      <p>Please enter your credentials to access the dashboard.</p>
+      <form id="login-form">
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input type="email" id="login-email" class="form-control" placeholder="staff@ravenhill.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary login-btn">
+          <i class="ph ph-sign-in"></i> Sign In
+        </button>
+      </form>
+      <div id="login-error" class="login-error" style="display: none;"></div>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <img src="logo-light.jpg" alt="Ravenhill Transport" class="brand-logo light-only" />
+        <img src="logo-dark.jpg" alt="Ravenhill Transport" class="brand-logo dark-only" />
+      </div>
+      <nav class="nav-links">
+        <a href="#" class="nav-link active" data-route="dashboard">
+          <i class="ph ph-squares-four"></i> Dashboard
+        </a>
+        <a href="#" class="nav-link" data-route="create">
+          <i class="ph ph-plus-circle"></i> New Record
+        </a>
+        <a href="#" class="nav-link" data-route="search">
+          <i class="ph ph-magnifying-glass"></i> Search Database
+        </a>
+        <a href="#" class="nav-link" data-route="transports">
+          <i class="ph ph-truck"></i> Manage Transport
+        </a>
+
+        <!-- Manage Records Section -->
+        <div class="nav-section-header" onclick="toggleManageRecords(this)" id="manage-records-toggle">
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <i class="ph ph-folders"></i>
+            <span>Manage Records</span>
+          </div>
+          <i class="ph ph-caret-down nav-caret"></i>
+        </div>
+        <div class="nav-subnav" id="manage-records-subnav" style="display:none;">
+          <a href="#" class="nav-sublink" data-status="Created" onclick="navigateStatus('Created')">
+            <span class="nav-status-dot" style="background:var(--status-created-text);"></span> Created
+          </a>
+          <a href="#" class="nav-sublink" data-status="Collected" onclick="navigateStatus('Collected')">
+            <span class="nav-status-dot" style="background:var(--status-collected-text);"></span> Collected
+          </a>
+          <a href="#" class="nav-sublink" data-status="At Facility" onclick="navigateStatus('At Facility')">
+            <span class="nav-status-dot" style="background:var(--status-holding-text);"></span> At Facility
+          </a>
+          <a href="#" class="nav-sublink" data-status="In Transit" onclick="navigateStatus('In Transit')">
+            <span class="nav-status-dot" style="background:var(--status-transit-text);"></span> In Transit
+          </a>
+          <a href="#" class="nav-sublink" data-status="Delivered" onclick="navigateStatus('Delivered')">
+            <span class="nav-status-dot" style="background:var(--status-delivered-text);"></span> Delivered <span
+              style="font-size:0.65rem; opacity:0.7;">(24h)</span>
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-profile">
+          <div class="avatar">RT</div>
+          <div class="user-info">
+            <span class="name">Inspector Staff</span>
+            <span class="role">Internal</span>
+          </div>
+          <button class="btn btn-icon sign-out-btn" onclick="logout()" title="Sign Out">
+            <i class="ph ph-sign-out"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-header">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <button class="btn btn-icon hamburger-menu" onclick="window.toggleMobileNav()" title="Menu">
+            <i class="ph ph-list" style="font-size: 1.5rem;"></i>
+          </button>
+          <h1 id="page-title">Dashboard</h1>
+        </div>
+        <div class="header-actions" style="display: flex; gap: 0.5rem; align-items: center; position: relative;">
+          <button class="btn btn-icon" id="column-filter-btn" title="Filter Dashboard Columns"
+            onclick="toggleColumnFilterPanel(event)">
+            <i class="ph ph-funnel" style="font-size: 1.1rem;"></i>
+          </button>
+          <div id="column-filter-panel"
+            style="display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:1000; background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:1rem; min-width:200px;">
+            <div
+              style="font-weight:600; font-size:0.85rem; color:var(--text-primary); margin-bottom:0.75rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border-color);">
+              <i class="ph ph-funnel" style="margin-right:4px;"></i> Visible Columns
+            </div>
+            <div id="column-filter-checks" style="display:flex; flex-direction:column; gap:0.5rem;"></div>
+            <button class="btn" onclick="applyColumnFilter()"
+              style="width:100%; margin-top:0.75rem; background:var(--accent-primary); color:#fff; font-size:0.8rem; padding:0.45rem 0.75rem;">Apply</button>
+          </div>
+          <button class="btn btn-icon toggle-sidebar" title="Toggle TV Mode / Fullscreen"
+            onclick="document.body.classList.toggle('tv-mode')" id="tv-toggle">
+            <i class="ph ph-monitor"></i>
+          </button>
+          <button class="btn btn-icon theme-toggle" title="Toggle Theme">
+            <i class="ph ph-moon"></i>
+          </button>
+        </div>
+      </header>
+
+      <div id="content-area" class="content-area">
+        <!-- Dynamic content injected here via JS -->
+      </div>
+
+      <!-- Persistent TV Mode Exit Button -->
+      <button class="btn btn-icon tv-mode-exit" onclick="document.body.classList.remove('tv-mode')"
+        title="Exit Fullscreen">
+        <i class="ph ph-corners-in"></i>
+      </button>
+
+      <div class="sidebar-overlay" onclick="window.toggleMobileNav()"></div>
+    </main>
+  </div>
+
+  <!-- Modal Container -->
+  <div id="modal-container"></div>
+
+  <script src="app.js?v=18"></script>
+</body>
+
+</html>
