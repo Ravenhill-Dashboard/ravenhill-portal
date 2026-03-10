@@ -1330,15 +1330,13 @@ function setupEditFormListeners(id) {
       const formData = new FormData(form);
       const data = Object.fromEntries(formData.entries());
 
-      // CRITICAL: FormData captures un-touched <input type="file"> slots as
-      // empty File objects (name:'', size:0). These must NOT overwrite the
-      // existing saved base64 photo strings in AppState. Strip any photo_N
-      // entry that is not a genuine non-empty string (real base64 data).
+      // CRITICAL: Strip any large photo/signature strings from the final update payload.
+      // These are already saved to the database instantly in the background when 
+      // uploaded/drawn. Removing them here keeps the final text-save lightweight and
+      // prevents browser timeouts/payload size errors on mobile.
       Object.keys(data).forEach(key => {
-        if (key.startsWith('photo_')) {
-          if (typeof data[key] !== 'string' || data[key].length === 0) {
-            delete data[key];
-          }
+        if (key.startsWith('photo_') || key === 'driverSignatureImg' || key === 'receiverSignatureImg') {
+          delete data[key];
         }
       });
 
