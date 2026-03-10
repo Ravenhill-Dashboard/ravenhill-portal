@@ -1549,7 +1549,7 @@ function generateItemDetailHTML(id) {
             <p><strong>Type:</strong> ${item.vehicleType}</p>
             <p><strong>Make & Model:</strong> ${item.make || 'N/A'} ${item.model || ''}</p>
             <p><strong>Identifier (VIN/Reg):</strong> ${item.identifier}</p>
-            <p><strong>Customer/Receiver:</strong> ${item.receiver || 'N/A'}</p>
+            <p><strong>Customer/Receiver:</strong> ${item.receiver || item.receiverName || 'N/A'}</p>
             <p><strong>Booking Contact:</strong> ${item.bookingContact || 'N/A'}</p>
             ${item.bookedCollectionTime ? `<p><strong>Booked Collection:</strong> ${new Date(item.bookedCollectionTime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>` : ''}
             <p style="grid-column: 1 / -1; margin-bottom: 0;"><strong>Pick Up Address:</strong> ${item.pickupAddress || 'N/A'}</p>
