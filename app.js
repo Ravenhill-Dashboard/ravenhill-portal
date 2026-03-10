@@ -116,28 +116,55 @@ const elements = {
 
 function init() {
   // 1. Auth State Listener
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
-      AppState.currentUser = user;
-      document.body.setAttribute('data-auth', 'visible');
-      elements.userNameDisplay.textContent = user.email.split('@')[0].replace('.', ' ').toUpperCase();
-      elements.userRoleDisplay.textContent = 'Staff';
-      elements.userAvatar.textContent = user.email.substring(0, 2).toUpperCase();
+      try {
+        // Fetch user role from Firestore
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        const userData = userDoc.data();
 
-      // Start Real-time Listeners
-      startRealTimeSync();
+        if (!userDoc.exists || userData.role !== 'admin') {
+          // Access Denied: Not an admin
+          await auth.signOut();
+          AppState.currentUser = null;
+          document.body.setAttribute('data-auth', 'hidden');
+          if (elements.loginError) {
+            elements.loginError.textContent = "Access Denied: You do not have permission to access the Admin Portal. Please use the Driver Portal.";
+            elements.loginError.style.display = 'block';
+          }
+          return;
+        }
 
-      // Navigate to dashboard if on initial load (Mobile redirect to Created)
-      if (AppState.currentRoute === 'dashboard') {
-        if (window.matchMedia('(max-width: 768px)').matches) {
-          navigateStatus('Created');
-        } else {
-          renderView('dashboard');
+        // Access Granted: User is an admin
+        AppState.currentUser = user;
+        document.body.setAttribute('data-auth', 'visible');
+        elements.userNameDisplay.textContent = (userData.fullName || user.email.split('@')[0]).replace('.', ' ').toUpperCase();
+        elements.userRoleDisplay.textContent = 'Adminstrator';
+        elements.userAvatar.textContent = (userData.fullName || user.email).substring(0, 2).toUpperCase();
+
+        // Start Real-time Listeners
+        startRealTimeSync();
+
+        // Navigate to dashboard if on initial load (Mobile redirect to Created)
+        if (AppState.currentRoute === 'dashboard') {
+          if (window.matchMedia('(max-width: 768px)').matches) {
+            navigateStatus('Created');
+          } else {
+            renderView('dashboard');
+          }
+        }
+
+        // Update sidebar counts immediately
+        updateSidebarCounts();
+
+      } catch (err) {
+        console.error("Auth role check failed:", err);
+        await auth.signOut();
+        if (elements.loginError) {
+          elements.loginError.textContent = "Authentication error. Please try again.";
+          elements.loginError.style.display = 'block';
         }
       }
-
-      // Update sidebar counts immediately
-      updateSidebarCounts();
     } else {
       AppState.currentUser = null;
       document.body.setAttribute('data-auth', 'hidden');
@@ -1609,19 +1636,19 @@ function generateItemDetailHTML(id) {
           <p><strong>Delivery Details:</strong></p>
           <div style="background: var(--bg-primary); border-radius: var(--radius-sm); margin-top: 0.5rem; border: 1px solid var(--border-color); padding: 1rem;">
              <p><strong>New Transit Damage:</strong> ${item.newTransitDamage || 'None reported'}</p>
-             <p style="margin-top: 0.5rem;"><strong>Receiver Name:</strong> ${item.receiverName || 'N/A'}</p>
-             ${item.receiverSignatureImg ? `
+             <p style="margin-top: 0.5rem;"><strong>Receiver Name:</strong> ${item.receiverName || item.receiver || 'N/A'}</p>
+             ${(item.receiverSignatureImg || item['receiver-signatureImg']) ? `
              <div style="margin-top: 0.5rem;">
                <p style="margin-bottom: 0.25rem;"><strong>Receiver Signature:</strong></p>
-               <img src="${item.receiverSignatureImg}" style="height: 60px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: white;">
+               <img src="${item.receiverSignatureImg || item['receiver-signatureImg']}" style="height: 60px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: white;">
              </div>` : `
              <p style="margin-top: 0.5rem;"><strong>Receiver Signature:</strong> <span style="font-family: 'Brush Script MT', cursive; font-size: 1.25rem;">${item.receiverSignature || item.signature || 'N/A'}</span></p>
              `}
              <p style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed var(--border-color);"><strong>Driver Name:</strong> ${item.driverName || 'N/A'}</p>
-             ${item.driverSignatureImg ? `
+             ${(item.driverSignatureImg || item['driver-signatureImg']) ? `
              <div style="margin-top: 0.5rem;">
                <p style="margin-bottom: 0.25rem;"><strong>Driver Signature:</strong></p>
-               <img src="${item.driverSignatureImg}" style="height: 60px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: white;">
+               <img src="${item.driverSignatureImg || item['driver-signatureImg']}" style="height: 60px; border: 1px solid var(--border-color); border-radius: var(--radius-sm); background: white;">
              </div>` : `
              <p style="margin-top: 0.5rem;"><strong>Driver Signature:</strong> <span style="font-family: 'Brush Script MT', cursive; font-size: 1.25rem;">${item.driverSignature || 'N/A'}</span></p>
              `}

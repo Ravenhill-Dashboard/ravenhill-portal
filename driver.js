@@ -30,9 +30,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Auth State Listener
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
       DriverState.currentUser = user;
+
+      // OPTIONAL: Fetch user profile to get full name
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          DriverState.userProfile = userDoc.data();
+        }
+      } catch (err) { console.warn("Could not fetch user profile:", err); }
+
       if (DriverState.currentReg) {
         showManifest();
       } else {
@@ -40,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } else {
       DriverState.currentUser = null;
+      DriverState.userProfile = null;
       showLogin();
       stopManifestSync();
     }
@@ -163,7 +173,7 @@ function renderManifestList() {
           ` : `
             <div style="margin-bottom: 0.4rem;">
               <div style="font-size: 0.75rem; color: var(--text-tertiary); text-transform: uppercase; font-weight: 700;">Customer/Receiver</div>
-              <div style="font-weight: 600; color: var(--text-primary);">${item.receiverName || 'N/A'}</div>
+              <div style="font-weight: 600; color: var(--text-primary);">${item.receiver || item.receiverName || 'N/A'}</div>
             </div>
             <div>
               <div style="font-size: 0.75rem; color: var(--text-tertiary); text-transform: uppercase; font-weight: 700;">Delivery Address</div>
@@ -337,7 +347,7 @@ function initSignaturePad(canvasId) {
       // BACKGROUND AUTO-SAVE: Save signature immediately to Firestore if we have an ID
       const recordId = canvas.closest('form')?.dataset.id;
       if (recordId) {
-        const fieldName = canvas.id.replace('-pad', 'Img'); // receiver-signature-pad -> receiverSignatureImg
+        const fieldName = canvas.id === 'receiver-signature-pad' ? 'receiverSignatureImg' : 'driverSignatureImg';
         const signatureData = canvas.toDataURL('image/png');
         try {
           await db.collection('inspections').doc(recordId).update({
@@ -739,12 +749,11 @@ window.submitDelivery = async function (e, id) {
       updatedAt: timestamp
     };
 
-    // CRITICAL: Strip any large photo/signature strings from the final update payload.
-    // These are already saved to the database instantly in the background when 
-    // uploaded/drawn. Removing them here keeps the final text-save lightweight and
-    // prevents browser timeouts/payload size errors on mobile.
+    // CRITICAL: Strip any large photo strings from the final update payload.
+    // These are already saved to the database instantly in the background.
+    // For signatures, we KEEP them in the final save as a safeguard (they are small).
     Object.keys(updateData).forEach(key => {
-      if (key.startsWith('photo_') || key === 'driverSignatureImg' || key === 'receiverSignatureImg') {
+      if (key.startsWith('photo_')) {
         delete updateData[key];
       }
     });
